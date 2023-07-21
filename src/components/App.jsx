@@ -8,7 +8,7 @@ import Credits from "./Credits/Credits"
 import {getAllImages} from "helpers/fetch/api"
 import {ToastContainer, toast} from "react-toastify"
 import "react-toastify/dist/ReactToastify.css"
-import {Container} from "./App.styled"
+import {Container, Error, ErrorText} from "./App.styled"
 
 class App extends Component {
   state = {
@@ -17,7 +17,8 @@ class App extends Component {
     largeImageURL: "",
     isLoading: false,
     showModal: false,
-    page: ""
+    page: "",
+    error: null
   }
 
   componentDidUpdate(prevProps, prevState) {
@@ -27,6 +28,7 @@ class App extends Component {
       )
     }
     if (prevState.searchName !== this.state.searchName) {
+      this.setState({gallery: []})
       this.handleImgSearchByApi()
     }
   }
@@ -40,13 +42,26 @@ class App extends Component {
   }
 
   handleImgSearchByApi = async () => {
-    const {searchName } = this.state
+    const {searchName} = this.state
     try {
       this.toggleLoading()
+
       const response = await getAllImages(searchName)
-      this.setState({gallery: [...response.data.hits]})
+      const gallery = response.data.hits
+
+      if (gallery.length === 0) {
+        this.setState({
+          gallery: [],
+          error: `No images found for ${searchName}`
+        })
+      } else {
+        this.setState({
+          gallery: [...gallery],
+          error: null
+        })
+      }
     } catch (error) {
-      console.log(error)
+      this.setState({error})
     } finally {
       this.toggleLoading()
     }
@@ -54,16 +69,17 @@ class App extends Component {
 
   loadMore = async () => {
     const {searchName, page} = this.state
+
     try {
       this.toggleLoading()
-      const response = await getAllImages(searchName, page + 1) // Fetch the next page
+      const response = await getAllImages(searchName, page + 1)
       const newGallery = response.data.hits
       this.setState(prevState => ({
         gallery: [...prevState.gallery, ...newGallery],
         page: prevState.page + 1
       }))
     } catch (error) {
-      console.log(error)
+      this.setState({error})
     } finally {
       this.toggleLoading()
     }
@@ -83,12 +99,19 @@ class App extends Component {
   }
 
   render() {
-    const {isLoading, gallery, largeImageURL, showModal} = this.state
+    const {isLoading, gallery, largeImageURL, showModal, error} = this.state
     const showLoadMoreButton = gallery.length > 0
+
     return (
       <Container>
         <Searchbar onSubmit={this.handleStateNameChange} />
         {isLoading && <LoaderIcon toggleLoading={this.toggleLoading} />}
+        {error &&
+          <Error>
+            <ErrorText>
+              "{error}"
+            </ErrorText>
+          </Error>}
         <ImagesGallery gallery={gallery} toggleModal={this.toggleModal} />
         {showModal &&
           <Modal
