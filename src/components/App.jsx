@@ -22,43 +22,37 @@ class App extends Component {
   }
 
   componentDidUpdate(prevProps, prevState) {
-    if (this.state.searchName.trim() === "") {
-      return toast.info(
-        "Oh, we have nothing to search.Please enter the keyword to find images"
+    if (
+      prevState.searchName !== this.state.searchName ||
+      prevState.page !== this.state.page
+    ) {
+      this.fetchImages()
+    }
+  }
+
+  fetchImages = async () => {
+    const {searchName, page} = this.state
+
+    if (searchName.trim() === "") {
+      this.setState({gallery: []})
+      return toast.error(
+        "Oh, we have nothing to search. Please enter the keyword to find images"
       )
     }
-    if (prevState.searchName !== this.state.searchName) {
-      this.setState({gallery: []})
-      this.handleImgSearchByApi()
-    }
-  }
 
-  handleStateNameChange = event => {
-    event.preventDefault()
-    this.setState({
-      searchName: event.target[0].value.toLowerCase(),
-      page: 1
-    })
-  }
-
-  handleImgSearchByApi = async () => {
-    const {searchName} = this.state
     try {
       this.toggleLoading()
-
-      const response = await getAllImages(searchName)
+      const response = await getAllImages(searchName, page)
       const gallery = response.data.hits
 
-      if (gallery.length === 0) {
-        this.setState({
-          gallery: [],
-          error: `No images found for ${searchName}`
-        })
+      if (gallery.length === 0 && page === 1) {
+        this.setState({gallery: []})
+       return toast.info(`No images found for ${searchName}`)
       } else {
-        this.setState({
-          gallery: [...gallery],
+        this.setState(prevState => ({
+          gallery: page === 1 ? gallery : [...prevState.gallery, ...gallery],
           error: null
-        })
+        }))
       }
     } catch (error) {
       this.setState({error})
@@ -67,22 +61,24 @@ class App extends Component {
     }
   }
 
-  loadMore = async () => {
-    const {searchName, page} = this.state
+  handleSubmit = event => {
+    event.preventDefault()
+    const {searchName} = this.state
+    const imgName = event.target[0].value.toLowerCase()
 
-    try {
-      this.toggleLoading()
-      const response = await getAllImages(searchName, page + 1)
-      const newGallery = response.data.hits
-      this.setState(prevState => ({
-        gallery: [...prevState.gallery, ...newGallery],
-        page: prevState.page + 1
-      }))
-    } catch (error) {
-      this.setState({error})
-    } finally {
-      this.toggleLoading()
+    if (searchName === imgName) {
+      return toast.info(`Oh, you already watching ${searchName} images`)
     }
+    this.setState({
+      searchName: imgName,
+      page: 1
+    })
+  }
+
+  loadMore = () => {
+    this.setState(prevState => ({
+      page: prevState.page + 1
+    }))
   }
 
   toggleLoading = () => {
@@ -104,7 +100,7 @@ class App extends Component {
 
     return (
       <Container>
-        <Searchbar onSubmit={this.handleStateNameChange} />
+        <Searchbar onSubmit={this.handleSubmit} />
         {isLoading && <LoaderIcon toggleLoading={this.toggleLoading} />}
         {error &&
           <Error>
